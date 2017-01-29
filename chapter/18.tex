@@ -1,0 +1,84 @@
+﻿\chapter{Intel Parallel XE Studio}
+
+\section{安装XE}
+这里选择Intel Parallel XE Studio Cluster Edtion，因为该版本包含了MPI库的内容。%
+官网上可以申请一年使用的License，为了方便这里选择2015版本，虽然不是最新版本，%
+但是省去了一年一申的麻烦。
+
+查看安装帮助可知，安装可以使用静默方式，事先用虚拟机安装一遍，可以得到配置文件，%
+安装命令为：./install.sh -d ./autoInstall.cfg。该文件内容为：
+\begin{Verbatim}[]
+文件：autoInstall.cfg
+ACCEPT_EULA=accept
+INSTALL_MODE=NONRPM
+CONTINUE_WITH_OPTIONAL_ERROR=yes
+PSET_INSTALL_DIR=/opt/intel
+CONTINUE_WITH_INSTALLDIR_OVERWRITE=yes
+PSET_MODE=install
+ACTIVATION_LICENSE_FILE=/media/sf_share/XE2015/Crack/zwt.lic
+ACTIVATION_TYPE=license_file
+AMPLIFIER_SAMPLING_DRIVER_INSTALL_TYPE=build
+AMPLIFIER_DRIVER_ACCESS_GROUP=vtune
+AMPLIFIER_DRIVER_PERMISSIONS=666
+AMPLIFIER_LOAD_DRIVER=yes
+AMPLIFIER_C_COMPILER=/usr/bin//gcc
+AMPLIFIER_KERNEL_SRC_DIR=/lib/modules/3.16.0-4-amd64/build
+AMPLIFIER_MAKE_COMMAND=/usr/bin//make
+AMPLIFIER_INSTALL_BOOT_SCRIPT=yes
+AMPLIFIER_DRIVER_PER_USER_MODE=no
+ENVIRONMENT_LD_SO_CONF=no
+MPSS_RESTART_STACK=no
+PHONEHOME_SEND_USAGE_DATA=no
+COMPONENTS=;intel-mpi-rt__noarch;... ... 一系列组件
+\end{Verbatim}
+
+接下来就可以使用该文件进行静默安装，命令为：./install.sh -s autoInstall.cfg。%
+这样就省去了以后安装需要交互操作的麻烦。
+
+安装完毕后，还需要配置用户环境。将以下内容加入/etc/profile文件中即可。
+\begin{Verbatim}[]
+source /opt/intel/bin/compilervars.sh intel64
+source /opt/intel/impi/5.0.1.035/bin64/mpivars.sh
+source /opt/intel/mkl/bin/mklvars.sh intel64 ilp64
+\end{Verbatim}
+
+\section{Fortran测试}
+接下来对一个简单的Fortran程序进行并行测试。
+\begin{Verbatim}[]
+文件：hello.f90
+program main
+use mpi
+implicit none
+
+	integer ::  id, err, comm, psize
+
+	call MPI_INIT( err )
+	call MPI_COMM_DUP( MPI_COMM_WORLD, comm, err )
+	call MPI_COMM_RANK( comm, id, err )
+	call MPI_COMM_SIZE( comm, psize, err )
+
+	write(*,*) id, psize,  " hello"
+
+	call MPI_BARRIER( comm, err )
+	call MPI_FINALIZE( err )
+end program
+\end{Verbatim}
+
+编译：
+\begin{Verbatim}[]
+mpiifort -o main hello.f90
+\end{Verbatim}
+
+执行：
+\begin{Verbatim}[]
+mpirun -np 4 ./main
+\end{Verbatim}
+\noindent 这里需要注意可执行文件的路径，即这里的“./”不要漏了。
+
+运行结果：
+\begin{Verbatim}[]
+           3           4  hello
+           0           4  hello
+           2           4  hello
+           1           4  hello
+\end{Verbatim}

@@ -1,0 +1,93 @@
+﻿\chapter{搭建本地镜像}\label{chapter:mirror}
+
+\section{查看源使用帮助}
+
+对于Debian 8.x版本来说，163源使用帮助如下。
+\begin{Verbatim}[]
+deb http://mirrors.163.com/debian/ jessie main non-free contrib
+deb http://mirrors.163.com/debian/ jessie-updates main non-free contrib
+deb http://mirrors.163.com/debian/ jessie-backports main non-free contrib
+deb-src http://mirrors.163.com/debian/ jessie main non-free contrib
+deb-src http://mirrors.163.com/debian/ jessie-updates main non-free contrib
+deb-src http://mirrors.163.com/debian/ jessie-backports main non-free contrib
+deb http://mirrors.163.com/debian-security/ jessie/updates main non-free contrib
+deb-src http://mirrors.163.com/debian-security/ jessie/updates main non-free contrib
+\end{Verbatim}
+
+其中，jessie-backports部分可以不用下载，关于各个部分的意义见%
+“有道笔记”中《Debian、Ubuntu 源列表说明》。
+
+\section{下载源}
+安装好apt-mirror工具之后，配置/etc/apt/mirror.list文件：
+\begin{Verbatim}[]
+set base_path    /media/sf_share/Debian8.x_amd64_mirror
+
+set mirror_path  $base_path/mirror
+set skel_path    $base_path/skel
+set var_path     $base_path/var
+set cleanscript  $var_path/clean.sh
+set defaultarch  <running host architecture>
+# set postmirror_script $var_path/postmirror.sh
+# set run_postmirror 0
+set nthreads     20
+set _tilde 0
+
+deb-amd64 http://mirrors.163.com/debian/ jessie main non-free contrib
+deb-amd64 http://mirrors.163.com/debian/ jessie-updates main non-free contrib
+deb-amd64 http://mirrors.163.com/debian/ jessie-backports main non-free contrib
+deb-amd64 http://mirrors.163.com/debian-security/ jessie/updates main non-free contr
+ib
+
+#clean http://ftp.cn.debian.org/debian
+\end{Verbatim}
+之后运行：apt-mirror命令即可。对Debian 8.x amd64来说，大概有70G以上的内容，可用tar工具%
+将其打包以便拷贝。
+
+\section{配置源}
+修改/etc/apt/sources.list文件：
+\begin{Verbatim}[]
+deb file:/xxx/Debian8.x_amd64_mirror/mirror/mirrors.163.com/debian/           \
+    jessie main contrib non-free
+deb file:/xxx/Debian8.x_amd64_mirror/mirror/mirrors.163.com/debian/           \
+    jessie-updates main non-free contrib
+deb file:/xxx/Debian8.x_amd64_mirror/mirror/mirrors.163.com/debian/           \
+    jessie-backports main non-free contrib
+deb file:/xxx/Debian8.x_amd64_mirror/mirror/mirrors.163.com/debian-security/  \
+    jessie/updates main non-free contrib
+\end{Verbatim}
+然后执行命令：apt-get update即可。
+
+\begin{quote}\kaishu
+\textbf{Tips:}使用本地源执行apt-get update时，如出现“Release file expired”错误，%
+执行如下命令进行更新操作：apt-get -o Acquire::Check-Valid-Until=false update。或者%
+在/etc/apt/apt.conf.d/建立文件例如取名：10no--check-valid-until，然后写入内容：%
+\begin{Verbatim}[]
+Acquire::Check-Valid-Until "0";
+\end{Verbatim}
+\end{quote}
+
+将上述内容保存到文件：sources.list.dat之中，配置过程可以使用脚本完成。
+\begin{Verbatim}[]
+文件：1.setSourcesList.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+echo -e "\nYong's 脚本: 备份 sources.list, 设置本地源\n"
+
+/bin/bash ./backupFile.sh /etc/apt/sources.list
+cp sources.list.dat /etc/apt/sources.list
+
+apt-get -o Acquire::Check-Valid-Until=false update && apt-get upgrade
+\end{Verbatim}
+该脚本调用的backupFile.sh用来备份文件，
+\begin{Verbatim}[]
+文件：backupFile.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+fileName=$1
+
+cp -p $1{,.$(date +%F-%H-%M-%S).backup}
+\end{Verbatim}

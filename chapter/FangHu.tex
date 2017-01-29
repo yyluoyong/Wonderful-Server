@@ -1,0 +1,123 @@
+﻿\chapter{安全防护}
+
+\section{防暴力破解}
+
+fail2ban 是 Linux 上的一个著名的入侵保护的开源框架，它会监控多个系统的日志文
+件（例如：/var/log/auth.log或者/var/log/secure）并根据检测到的任何可疑的行
+为自动触发不同的防御动作，可以用来防范如ssh、ftp等被暴力破解。
+
+Debian 8.x安装fail2ban后，配置文件位置在/etc/fail2ban目录下：
+\begin{Verbatim}[]
+drwxr-xr-x 2 root root  4096 5月  30 21:54 action.d        <-- 定义动作
+-rw-r--r-- 1 root root  1525 3月  15  2014 fail2ban.conf
+drwxr-xr-x 2 root root  4096 3月  19  2014 fail2ban.d
+drwxr-xr-x 2 root root  4096 5月  30 21:23 filter.d        <-- 定义日志分析策略
+-rw-r--r-- 1 root root 13883 5月  30 21:48 jail.conf       <-- 设置需要保护的服务
+drwxr-xr-x 2 root root  4096 3月  19  2014 jail.d
+\end{Verbatim}
+
+一般情况下，我们只需要修改jail.conf即可，或者在jail.d自定义。jail.conf文件最开头的%
+[DEFAULT]部分是全局设置，可以在局部设置中覆盖全局变量。
+
+\begin{Verbatim}[]
+[DEFAULT]
+ignoreip = 127.0.0.1/8
+ignorecommand =
+bantime  = 600                              #封锁时间，负数表示永久封锁
+findtime = 600                              #在多长时间以内达到条件则开始执行封锁
+maxretry = 3                                #如600秒达到3次则执行
+backend = auto
+usedns = warn
+destemail = zhenyanxl@126.com               #警报邮件发给该地址
+sendername = Fail2Ban
+sender = "Fail2Ban 警报"
+banaction = iptables-multiport
+mta = sendmail                              #邮件参数，可改为mail等
+protocol = tcp
+chain = INPUT
+action_ = %(banaction)s[略...]              #仅封锁
+action_mw = %(banaction)s[略...]            #封锁+发送邮件
+            %(mta)s-whois[略...]
+action_mwl = %(banaction)s[略...]           #封锁+发送邮件（邮件包含日志信息）
+             %(mta)s-whois-lines[略...]
+action = %(action_)s                        #默认动作
+\end{Verbatim}
+
+例如，可以修改ssh和pure-ftp的默认设置，让封锁之后发送警报邮件。
+
+\begin{Verbatim}[]
+[ssh]
+enabled  = true                              <-- 开启监控
+port     = ssh
+filter   = sshd
+mta      = mail                              <-- 使用mail命令发送邮件
+action   = %(action_mwl)s
+logpath  = /var/log/auth.log                 <-- 日志位置
+maxretry = 6
+
+[pure-ftpd]
+enabled  = true
+port     = ftp,ftp-data,ftps,ftps-data
+filter   = pure-ftpd
+mta      = mail
+action   = %(action_mwl)s
+logpath  = /var/log/syslog
+maxretry = 6
+\end{Verbatim}
+
+\section{防端口扫描}
+
+在服务器没有使用硬件防火墙的情况下，为了防止有人恶意获取服务器用途等信息，防端口扫描%
+十分必要。PortSentry是一款非常容易使用的防恶意扫描工具，它可设置如下几种抵挡方式：
+
+\begin{itemize*}
+  \item 路由表：通过设置路由表，将信息流导向虚假位置。
+  \item TCP\_wrappers：将对方的IP写入/etc/hosts.deny文件。
+  \item iptables：通过修改iptables，将对方数据包过滤。
+  \item syslog()：给出日志消息，返回警告信息。
+  \item 自定义脚本。
+\end{itemize*}
+
+其中，路由表和iptables是两种较好的方法。
+
+在Debian 8.x中，安装PortSentry以后其配置文件在/etc/portsentry目录中，主要的配置文件%
+是portsentry.conf，默认内容如下：
+
+\begin{Verbatim}[]
+TCP_PORTS="1,11,15,79,111,119,143,540,635,1080,1524,2000,5742,6667,12345,12346,20034
+UDP_PORTS="1,7,9,69,161,162,513,635,640,641,700,37444,34555,31335,32770,32771,32772,
+ADVANCED_PORTS_TCP="1024"
+ADVANCED_PORTS_UDP="1024"
+ADVANCED_EXCLUDE_TCP="113,139"
+ADVANCED_EXCLUDE_UDP="520,138,137,67"
+IGNORE_FILE="/etc/portsentry/portsentry.ignore"
+HISTORY_FILE="/var/lib/portsentry/portsentry.history"
+BLOCKED_FILE="/var/lib/portsentry/portsentry.blocked"
+RESOLVE_HOST = "0"
+BLOCK_UDP="0"        <-- 默认不阻挡UDP扫描，将值改为 1
+BLOCK_TCP="0"        <-- 默认不阻挡TCP扫描，将值改为 1
+KILL_ROUTE="/sbin/route add -host $TARGET$ reject"       <-- 利用路由阻挡
+#KILL_ROUTE="/sbin/route add $TARGET$ 333.444.555.666"   <-- 将数据流导向不存在的主机
+KILL_HOSTS_DENY="ALL: $TARGET$ : DENY"   <-- 利用TCP_wrappers阻挡
+SCAN_TRIGGER="0"
+\end{Verbatim}
+
+
+对UDP和TCP，PortSentry分别有三种检测模式：
+
+\begin{itemize*}
+  \item portsentry-tcp：TCP基本端口绑定模式；
+  \item portsentry-udp：UDP基本端口绑定模式；
+  \item portsentry-stcp：TCP秘密扫描检测模式；
+  \item portsentry-sudp：UDP秘密扫描检测模式；
+  \item portsentry-atcp：TCP高级秘密扫描检测模式；
+  \item portsentry-audp：UDP高级秘密扫描检测模式。
+\end{itemize*}
+
+推荐使用高级秘密扫描检测模式，配置文件是/etc/default/portsentry，修改其默认值%
+然后重启portsentry服务即可。
+
+\begin{Verbatim}[]
+TCP_MODE="atcp"
+UDP_MODE="audp"
+\end{Verbatim}

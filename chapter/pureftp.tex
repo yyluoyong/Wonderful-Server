@@ -1,0 +1,77 @@
+﻿\chapter{PureFTP}\label{chapter:FTP}
+
+\section{安装配置}
+
+在Debian中，PureFTP通过/etc/pure-ftpd/conf/目录中的配置文件来确定启动参数。%
+也可以通过查询启动参数的意义，直接采用命令启动，不过最好还是配置这些文件，%
+通过PureFTP的内置转换工具，自动将配置文件转换为启动参数。
+
+参数的意义参见官方手册，这里通过脚本来完成配置。
+
+\begin{quote}
+\kaishu
+\textbf{Tips：}官方手册中除了包含编译、使用等内容以外，还有一个常见问题列表，这个列表%
+非常值得参考，例如如何设置给用户设置共享文件夹等。
+\end{quote}
+
+\begin{Verbatim}[]
+文件：5.ftpSet.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+echo -e "\n安装 pureFTP"
+
+apt-get install pure-ftpd pure-ftpd-common -y
+
+#配置 pureFTP
+echo -e "\n配置 pureFTP"
+confDir=/etc/pure-ftpd/conf
+
+#默认已禁止匿名登录
+echo "yes" > $confDir/ChrootEveryone
+echo "yes" > $confDir/UnixAuthentication
+echo "yes" > $confDir/ProhibitDotFilesWrite
+echo "yes" > $confDir/ProhibitDotFilesRead
+echo "yes" > $confDir/DontResolve
+
+echo "5"  > $confDir/MaxClientsPerIP
+echo "20" > $confDir/MaxIdleTime
+echo "98" > $confDir/MaxDiskUsage
+
+echo "117 117" > $confDir/Umask
+
+echo -e "\n重启 pure-ftpd 服务"
+systemctl restart pure-ftpd
+\end{Verbatim}
+
+\section{设置共享目录}
+在chroot开启的时候如何给FTP用户设置共享目录呢？%
+这个问题官方的常见问题手册给出了回答。%
+PureFTP源码编译时，可以选择虚拟chroot选项，这种情形下，可以通过%
+创建软链接：ln -s 来实现共享(注意使用绝对路径)。但是，Debian官方仓库中并未开启%
+虚拟chroot选项。另一种更好的方法是，将共享目录挂载到用户目录下，命令为：%
+mount -\,-bind。可写到/etc/fstab文件中，实现开机挂载。
+
+\section{虚拟用户}
+PureFTP的用户不一定非得是Linux用户，可以通过设定一个专门的FTP Linux账户，然后%
+所有虚拟用户通过该专门的Linux账户访问FTP，具体命令参见官方手册。
+
+增加虚拟、修改虚拟账户的命令是：pure-pw，其后跟的命令和Linux账户配置是一样的。%
+存储虚拟账户的文件格式为：
+
+\begin{Verbatim}[]
+<account>:<password>:<uid>:<gid>:<gecos>:<home>:...
+\end{Verbatim}
+
+该文件包含了用户使用FTP的宽带等设置，其中，account、password、uid、gid、home为非空字段。
+密码的加密方式和系统账户是一样的，home字段若以“\verb"/./"”结尾则表示chroot。%
+添加虚拟用户后，Pure-FTP的命令可将该文件转化为二进制的PureDB，该文件是二进制文件，%
+经过了排序处理，在有大量虚拟用户的情况下，可以加快处理速度。%
+也可以使用内置命令直接复制系统账户。%
+
+\begin{quote}\kaishu
+\textbf{Tips:} 须查看Pure-FTP的配置文件，确认配置文件中默认设置的认证文件位置。%
+例如，在Debian 7.x中，须做一下如下操作：\verb"cd /etc/pure-ftpd/auth"，%
+然后 \verb"ln -s ../conf/PureDB"，否则虚拟账户会无法进行认证，可以查看log确认问题所在。
+\end{quote}

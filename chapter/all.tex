@@ -1,0 +1,559 @@
+﻿\chapter{文件服务器}
+
+文件服务器选定的系统版本是Debian 8.x amd64。
+
+\section{设置本地源}
+在离线环境下，为了安装软件方便，需要使用本地源，具体设置参见第\ref{chapter:mirror} 章。
+
+\section{安装常用软件}
+安装编译环境、Git、Vim、ctags、sudo 等软件包。
+\begin{Verbatim}[]
+文件：2.installPackages.sh
+#!/bin/bash
+
+echo -e "\nYong's 脚本: 安装 编译环境、Git、Vim、ctags、sudo 等软件包\n"
+
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+apt-get install build-essential vim -y
+apt-get install ctags -y
+apt-get install git git-gui -y
+apt-get install sudo -y
+\end{Verbatim}
+
+\section{配置root使用环境}
+主要设置bash环境、Vim环境等。
+\begin{Verbatim}[]
+文件：3.setRootEnv.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+echo -e "\nYong's 脚本: 设置 root 的用户环境\n"
+
+homeDir=/root
+chmod 750 $homeDir
+
+# 创建 vim 配置文件目录
+if [ ! -d "/root/.vim" ]
+then
+	mkdir $homeDir/.vim
+fi
+
+echo -e "Yong's 脚本: 复制 Vim 插件\n"
+
+cp -av VimPlugin/* $homeDir/.vim/
+cp -v Vim.dat $homeDir/.vimrc
+
+
+echo -e "\nYong's 脚本: 在 /etc/profile 中设置 Intel 编译器的环境变量"
+
+cat /etc/profile | grep -q "source /opt/intel"
+
+if [ $? -ne 0 ]
+then
+	/bin/bash ./backupFile.sh /etc/profile
+	cat profile.dat >> /etc/profile
+fi
+
+echo -e "\nYong's 脚本: 设置 .bashrc"
+
+cat $homeDir/.bashrc | grep -q ".mybashset"
+
+if [ $? -ne 0 ]
+then
+	cp -v rootBash.dat $homeDir/.mybashset
+	/bin/bash ./backupFile.sh $homeDir/.bashrc
+	echo "source $homeDir/.mybashset" >> $homeDir/.bashrc
+fi
+\end{Verbatim}
+
+脚本中调用的其他文件是，
+
+\begin{Verbatim}[]
+文件：Vim.dat
+"显示行号
+set number
+
+"显示光标当前位置
+set ruler
+
+"总是显示状态栏
+set laststatus=2
+
+" 高亮显示当前行/列
+"set cursorline
+"set cursorcolumn
+
+"高亮显示搜索结果
+set hlsearch
+
+"查找前预览
+set incsearch
+
+"搜索时大小写不敏感
+set ignorecase
+
+"关闭兼容模式
+set nocompatible
+
+"禁止光标闪烁,gVim有效
+"set gcr=a:block-blinkon0
+
+"缩进方式
+set tabstop=4
+set softtabstop=4
+set shiftwidth=4
+
+"基于缩进或语法进行代码折叠
+"set foldmethod=indent
+set foldmethod=syntax
+"启动 vim 时关闭折叠代码
+set nofoldenable
+
+"配色方案
+colorscheme koehler
+
+" 开启文件类型侦测
+filetype on
+
+" 根据侦测到的不同类型加载对应的插件
+filetype plugin on
+
+
+"语法高亮
+if &t_Co > 2 || has("gui_running")
+	syntax on
+	set hlsearch
+endif
+
+"插件设置
+map <F4> :NERDTreeToggle<CR>
+map <F2> :TlistToggle<CR>
+let Tlist_Use_Right_Window=1
+
+nmap <C-H> <C-W>h " control+h进入左边的窗口
+nmap <C-J> <C-W>j " control+j进入下边的窗口
+nmap <C-K> <C-W>k " control+k进入上边的窗口
+nmap <C-L> <C-W>l " control+l进入右边的窗口
+
+"对齐插件设置，不是特别灵敏
+let mapleader=";"
+nmap <Leader>t& :Tab /&<CR>
+vmap <Leader>t& :Tab /&<CR>
+nmap <Leader>t= :Tab /=<CR>
+vmap <Leader>t= :Tab /=<CR>
+nmap <Leader>t" :Tab /"<CR>
+vmap <Leader>t" :Tab /"<CR>
+nmap <Leader>t: :Tab /:<CR>
+vmap <Leader>t: :Tab /:<CR>
+nmap <Leader>t:: :Tab /:\zs<CR>
+vmap <Leader>t:: :Tab /:\zs<CR>
+nmap <Leader>t, :Tab /,<CR>
+vmap <Leader>t, :Tab /,<CR>
+nmap <Leader>t,, :Tab /,\zs<CR>
+vmap <Leader>t,, :Tab /,\zs<CR>
+nmap <Leader>t<Bar> :Tab /<Bar><CR>
+vmap <Leader>t<Bar> :Tab /<Bar><CR>
+\end{Verbatim}
+
+包含Intel编译器的使用环境。
+\begin{Verbatim}[]
+文件：profile.dat
+source /opt/intel/bin/compilervars.sh intel64
+source /opt/intel/impi/5.0.1.035/bin64/mpivars.sh
+source /opt/intel/mkl/bin/mklvars.sh intel64 ilp64
+\end{Verbatim}
+
+root的Bash环境。
+\begin{Verbatim}[]
+文件：rootBash.dat
+umask 0007
+
+export LS_OPTIONS='--color=auto'
+eval "`dircolors`"
+alias ls='ls $LS_OPTIONS'
+alias ll='ls $LS_OPTIONS -l'
+alias l='ls $LS_OPTIONS -lA'
+
+export GIT_EDITOR=vim
+\end{Verbatim}
+
+
+\section{增加用户}
+
+增加用户、设置用户使用环境等。
+
+\begin{Verbatim}[]
+文件：4.addUsers.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+# 增加用户组
+teamName=ZhangShuHaiTeam
+groupadd $teamName
+
+# 用户
+accounts=$(cat accounts.dat)
+
+# HOME目录
+homeDir=/home
+
+# 创建共享目录
+shareDir=/home/TeamShare
+mkdir $shareDir
+chown root:$teamName $shareDir
+chmod 2770 $shareDir
+
+/bin/bash ./backupFile.sh /etc/fstab
+
+for data in $accounts
+do
+	userName=$(echo $data | cut -d ":" -f 1)
+	initPasswd=$(echo $data | cut -d ":" -f 2)
+
+	#创建用户
+	echo "Add User：" $userName
+	useradd -G $teamName -m -s /bin/bash $userName
+	echo $userName:$initPasswd | chpasswd
+
+	#修改主文件目录权限
+	if [ -d $homeDir/$userName ]
+	then
+		echo "Set HOMEDIR 750：" $homeDir/$userName
+		chmod 750 $homeDir/$userName
+	fi
+
+	/bin/bash ./4.1.setuserEnv.sh $userName
+	/bin/bash ./4.2.shareDir.sh   $userName
+done
+
+mount -a
+
+/bin/bash ./4.3.setACL.sh
+
+echo -e "\nAll Done!"
+\end{Verbatim}
+
+其中，accounts.dat每一行格式是：“用户名:密码”。
+
+设置用户的Bash、Vim环境等。
+\begin{Verbatim}[]
+文件：4.1.setuserEnv.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+echo -e "\nYong's 脚本: 设置 $1 的用户环境\n"
+
+userName=$1
+homeDir=/home/$userName
+
+# 创建 Vim 插件目录
+if [ ! -d "$homeDir/.vim" ]
+then
+	mkdir $homeDir/.vim
+fi
+
+# 复制 Vim 插件
+echo -e "Yong's 脚本: 复制 Vim 插件\n"
+
+cp -av VimPlugin/* $homeDir/.vim/
+chown -R $userName:$userName $homeDir/.vim
+
+# 复制 Vim 配置文件
+cp -v Vim.dat $homeDir/.vimrc
+chown $userName:$userName $homeDir/.vimrc
+
+# 复制 bash 配置文件
+echo -e "\nYong's 脚本: 设置 .bashrc"
+
+/bin/bash ./backupFile.sh $homeDir/.bashrc
+cp -v Bash.dat $homeDir/.mybashset
+chown $userName:$userName $homeDir/.mybashset
+
+cat $homeDir/.bashrc | grep -q ".mybashset"
+
+if [ $? -ne 0 ]
+then
+	echo "source $homeDir/.mybashset" >> $homeDir/.bashrc
+fi
+
+# 禁止图形界面登陆
+/bin/bash ./backupFile.sh /etc/pam.d/gdm-password
+
+echo "auth    required    pam_succeed_if.so user != $1 quiet_success" >> /etc/pam.d/gdm-password
+\end{Verbatim}
+
+
+\begin{Verbatim}[]
+文件：bash.dat
+umask 0007
+
+export LS_OPTIONS='--color=auto'
+eval "`dircolors`"
+alias ls='ls $LS_OPTIONS'
+alias ll='ls $LS_OPTIONS -l'
+alias l='ls $LS_OPTIONS -lA'
+
+export GIT_EDITOR=vim
+\end{Verbatim}
+
+FTP的共享文件夹设置。
+\begin{Verbatim}[]
+文件：4.2.shareDir.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+echo -e "\nYong's 脚本: 设置 $1 的用户环境\n"
+
+useName=$1
+homeDir=/home/$useName
+
+shareDir=$homeDir/TeamShare
+
+# 创建共享目录
+if [ ! -d "$shareDir" ]
+then
+	mkdir $shareDir
+	chown $useName:$useName $shareDir
+else
+	echo -e "\nYong's 脚本: $shareDir 目录已存在\n"
+fi
+
+# 开机挂载
+echo "/home/TeamShare	$shareDir	none	defaults,bind	0	0" \
+	>> /etc/fstab
+\end{Verbatim}
+
+某个特殊用户的ACL权限设置。
+\begin{Verbatim}[]
+文件：4.3.setACL.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+# 用户
+accounts=$(cat accounts.dat)
+
+# HOME目录
+homeDir=/home
+
+superUser=特殊用户名
+
+for data in $accounts
+do
+	userName=$(echo $data | cut -d ":" -f 1)
+
+	if [ $userName != $superUser ]
+	then
+		setfacl -m u:$superUser:rx	$homeDir/$userName	
+	fi
+
+done
+
+echo -e "\nYong's 脚本: ACL权限设置完毕\n"
+\end{Verbatim}
+
+\section{FTP}
+在对比了几种FTP之后，选择PureFTP，安装配置见第\ref{chapter:FTP} 章。
+
+
+\section{防火墙}
+配置防火墙，并设置开机启动。
+\begin{Verbatim}[]
+文件：6.setFirewallService.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+basepath=/root/FirewallScript # 脚本放置目录
+
+if [ -f "$basepath" ]; then
+	echo $basepath " 是一个文件，与要创建的文件夹重名"
+	exit 1
+fi
+
+if [ ! -d "$basepath" ]; then
+	mkdir -p $basepath
+fi
+
+cp -p FirewallScript/* $basepath
+
+cat $basepath/Firewall.service.dat > /etc/systemd/system/Firewall.service
+
+systemctl enable Firewall
+systemctl start Firewall
+\end{Verbatim}
+
+配置iptables的脚本。
+\begin{Verbatim}[]
+文件：FirewallScript/Firewall.sh
+#!/bin/bash
+
+# 请先输入您的相关参数，不要输入错误了！
+EXTIF="eth0" # 这个是可以连上 Public IP 的网络接口
+INIF=""      # 内部 LAN 的连接接口；若无则写成 INIF=""
+#INNET="192.168.100.0/24" # 若无内部网域接口，请填写成 INNET=""
+INNET=""				  # 若无内部网域接口，请填写成 INNET=""
+export EXTIF INIF INNET
+
+
+# 1. 清除规则、设定默认政策及开放 lo 与相关的设定值
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+iptables -F
+iptables -X
+iptables -Z
+iptables -P INPUT   DROP	# 默认规则设为拒绝，清除设置的时候要小心
+iptables -P OUTPUT  ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+basepath=/root/FirewallScript # 脚本放置目录
+
+# 2. 启动额外的防火墙 script 模块
+if [ -f "$basepath/deny.sh" ]; then
+	/bin/bash $basepath/deny.sh	# 阻止某些网络进入
+fi
+if [ -f "$basepath/allow.sh" ]; then
+	/bin/bash $basepath/allow.sh  # 运行某些网络进入
+fi
+
+# 3. 允许某些类型的 ICMP 封包进入
+# AICMP="0 3 3/4 4 11 12 14 16 18"
+# for tyicmp in $AICMP
+# do
+# 	iptables -A INPUT -i $EXTIF -p icmp --icmp-type $tyicmp -j ACCEPT
+# done
+
+# 4. 允许某些服务的进入，请依照你自己的环境开启
+# iptables -A INPUT -p TCP -i $EXTIF --dport  21 --sport 1024:65534 -j ACCEPT # FTP
+# iptables -A INPUT -p TCP -i $EXTIF --dport  22 --sport 1024:65534 -j ACCEPT # SSH
+# iptables -A INPUT -p TCP -i $EXTIF --dport  25 --sport 1024:65534 -j ACCEPT # SMTP
+# iptables -A INPUT -p UDP -i $EXTIF --dport  53 --sport 1024:65534 -j ACCEPT # DNS
+# iptables -A INPUT -p TCP -i $EXTIF --dport  53 --sport 1024:65534 -j ACCEPT # DNS
+# iptables -A INPUT -p TCP -i $EXTIF --dport  80 --sport 1024:65534 -j ACCEPT # WWW
+# iptables -A INPUT -p TCP -i $EXTIF --dport 110 --sport 1024:65534 -j ACCEPT # POP3
+# iptables -A INPUT -p TCP -i $EXTIF --dport 443 --sport 1024:65534 -j ACCEPT # HTTPS
+
+
+# 5. 最终将这些功能储存下来吧！
+iptables-save
+\end{Verbatim}
+
+设置允许通过防火墙的IP。
+\begin{Verbatim}[]
+文件：FirewallScript/allow.sh
+#!/bin/bash
+basepath=/root/FirewallScript # 脚本放置目录
+
+ipAllow=$(cat $basepath/ipAllow.dat)
+
+for userIP in $ipAllow
+do
+	iptables -A INPUT -i $EXTIF -s $userIP -j ACCEPT
+	echo $userIP
+done
+\end{Verbatim}
+
+设置阻止通过防火墙的IP。
+\begin{Verbatim}[]
+文件：FirewallScript/deny.sh
+#!/bin/bash
+basepath=/root/FirewallScript # 脚本放置目录
+
+ipDeny=$(cat $basepath/ipDeny.dat)
+
+for userIP in $ipDeny
+do
+	iptables -A INPUT -i $EXTIF -s $userIP -j DROP
+done
+\end{Verbatim}
+
+其中，ipAllow.dat和ipDeny.dat分别包含了允许通过的IP和阻止通过的IP。
+
+\begin{quote}
+\kaishu
+\textbf{Tips：}在清空防火墙的时候，需要注意事先将默认策略改为ACCEPT。命令为：%
+iptables -P INPUT ACCEPT。
+\end{quote}
+
+
+\section{限制使用su和sudo}
+设置部分用户可以使用某些系统命令。
+\begin{Verbatim}[]
+文件：7.suAndsudo.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+#限制使用部分sudo命令
+/bin/bash ./backupFile.sh /etc/sudoers
+cat sudoers.dat >> /etc/sudoers
+
+#限制使用su
+addgroup wheel
+usermod -a -G wheel yong	# 加入wheel组的用户可以使用su命令
+
+/bin/bash ./backupFile.sh /etc/pam.d/su
+cat su.dat >> /etc/pam.d/su
+\end{Verbatim}
+
+该文件各项意义参见《鸟哥Linux私房菜——基础篇》。
+\begin{Verbatim}[]
+文件：sudoers.dat
+%用户组名 ALL=/sbin/poweroff,/sbin/reboot
+\end{Verbatim}
+
+/etc/pam.d/su文件的配置可以参见该文件本身的注释说明，另外可参考《鸟哥Linux私房菜——基础篇》%
+的“PAM模块简介”部分。
+\begin{Verbatim}[]
+文件：su.dat
+auth	required	pam_wheel.so
+\end{Verbatim}
+
+\section{删除系统自带账户}
+作为文件服务器，有一些系统账户用不到，可以删除。
+\begin{Verbatim}[]
+文件：8.delSysUserAndGroup.sh
+#!/bin/bash
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin; export PATH
+
+delUsers="lp sync news uucp games"
+delGroups="lp news uucp games dip"
+
+for userName in $delUsers
+do
+	echo "Delete User: " $userName
+	userdel $userName
+done
+
+echo -e "Delete users done.\n"
+
+for groupName in $delGroups
+do
+	echo "Delete Group: " $groupName
+	groupdel $groupName
+done
+
+echo -e "Delete groups done.\n"
+\end{Verbatim}
+
+\section{温度监控}
+CPU等温度监控，安装lm-sensors模块。
+\begin{itemize*}
+  \item 安装：apt-get install lm-sensors -y
+  \item 探测：sensors-detect
+  \item 查看：sensors
+\end{itemize*}
+
+硬盘温度监控，安装hddtemp模块。详见“有道笔记”中《hddtemp》。
+\begin{itemize*}
+  \item 安装：apt-get install hddtemp
+  \item 探测：hddtemp /dev/sda /dev/sdb ... ...
+\end{itemize*}

@@ -1,0 +1,63 @@
+﻿\chapter{邮件设置}
+
+这里使用的软件为msmtp，该软件小巧且易于配置。邮箱客户端软件用的是mutt，该%
+软件同样小巧，但是功能强大。
+
+\begin{quote}\kaishu
+\textbf{注意：}一般系统提供了mail、mutt、sendmail等工具，%
+有时候系统提供的sendmail工具指向了其它的mail服务软件，例如在Debian 8.3中，sendmail是%
+exim4这个软件的一个软链接，而mail命令来自于bsd-mailx。
+\end{quote}
+
+\section{mail配置}
+mail会读取/etc/目录下的mail.rc文件，或者读取用户家目录下的.mailrc文件。但是%
+mail似乎不能自定义配置文件的位置，在某些情况下会导致不便。可以在mail.rc文件中%
+增加一行，使用msmtp发送邮件。
+
+\begin{Verbatim}[]
+set sendmail="/usr/bin/msmtp"
+\end{Verbatim}
+
+\section{msmtp配置文件}
+
+msmtp会读取/etc/目录下的msmtprc文件，或者读取用户家目录下的.msmtprc文件，%
+也可以用-C参数指定配置文件。一个示例如下：
+
+\begin{Verbatim}[]
+account default
+host smtp.126.com                       <-- smtp服务器
+port 25                                 <-- smtp服务器端口
+from xxx@xxx.com
+auth login
+user xxx@xxx.com                        <-- 邮箱
+password xxxx                           <-- 密码
+logfile /root/Mail/Log/msmtp.log        <-- 日志位置
+\end{Verbatim}
+
+
+\section{mutt配置}
+mutt会读取/etc/目录下的Muttrc文件，或读取用户家目录下的.muttrc文件，%
+也可以用-F参数指定配置文件。一个示例如下：
+\begin{Verbatim}[]
+set from="xxx@xxx.com"                  <-- 发件人
+set sendmail="/usr/bin/msmtp"           <-- 使用msmtp发送邮件
+set use_from=yes
+set realname="张三"
+set editor="vim"                        <-- 发送邮件使用的文本编辑器
+\end{Verbatim}
+
+在使用nagios的邮件警报功能时，可以将配置文件放在一个特定的目录下，稍微修改一下%
+上述参数即可。
+
+\begin{Verbatim}[]
+set from="xxx@xxx.com"
+set sendmail="/usr/bin/msmtp -C /etc/nagios3/.msmtprc"
+set use_from=yes
+set realname="Nagios3 警报"
+set editor="vim"
+\end{Verbatim}
+
+然后将发送邮件的命令改为：\verb"/usr/bin/mutt -F /etc/nagios3/.muttrc"。%
+不过需要注意的是，要保证两份配置文件对nagios进程的拥有者是可读取的，例如%
+默认情况下，Debian 8.x中nagios是以nagios用户和nagios组权限执行的。当然也可以%
+将配置文件放置在nagios进程的拥有者的家目录底下，此时使用mail命令也可。
